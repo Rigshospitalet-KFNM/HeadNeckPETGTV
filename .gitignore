@@ -1,0 +1,5 @@
+venv/
+data/
+Docker_package.zip
+Docker_package/
+submodules/
