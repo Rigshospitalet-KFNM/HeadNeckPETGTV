@@ -1,5 +1,6 @@
 #region Imports
 # Python standard library
+from logging import DEBUG
 from subprocess import run as run_subprocess
 from pathlib import Path
 from os import environ, getcwd
@@ -108,12 +109,13 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     'CT'  : CT_Input,
   }
 
-
-  port=11113
+  ip='0.0.0.0'
+  port=11112
   log_output = Path(LOG_PATH)
   ae_title = "PETGTVAISEG"
   data_directory = ARCHIVE_PATH
   processing_directory = WORKING_PATH
+  log_level = DEBUG
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
     ct_path = input_data.paths['CT']
