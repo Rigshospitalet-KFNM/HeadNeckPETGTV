@@ -12,7 +12,7 @@ from dicomnode.dicom.dimse import Address
 from dicomnode.server.grinders import IdentityGrinder
 from dicomnode.server.nodes import AbstractQueuedPipeline
 from dicomnode.server.input import AbstractInput
-from dicomnode.server.output import DicomOutput, PipelineOutput
+from dicomnode.server.output import DicomOutput, PipelineOutput, FileOutput, MultiOutput
 from dicomnode.server.pipeline_tree import InputContainer
 
 
@@ -34,7 +34,7 @@ if not WORKING_PATH.exists():
   WORKING_PATH.mkdir()
 
 
-ENVIRONMENT_LOG_PATH = "PIPELINE_WORKING_PATH"
+ENVIRONMENT_LOG_PATH = "PIPELINE_LOG_PATH"
 ENVIRONMENT_LOG_PATH_VALUE = environ.get(ENVIRONMENT_LOG_PATH,
                                          "/var/log/pipeline")
 
@@ -45,7 +45,7 @@ ENVIRONMENT_DCM2NIIX_PATH = "PIPELINE_DCM2NIIX"
 DCM2NIIX = environ.get(ENVIRONMENT_DCM2NIIX_PATH,
                                              "dcm2niix")
 
-which_output = run_subprocess(f'which {DCM2NIIX}', capture_output=True)
+which_output = run_subprocess(['which', DCM2NIIX], capture_output=True)
 if(not len(which_output.stdout)):
   raise Exception("COULD NOT FIND DCM2NIIX")
 
@@ -54,7 +54,7 @@ ENVIRONMENT_RESAMPLE_PATH = "PIPELINE_RESAMPLE"
 RESAMPLE = environ.get(ENVIRONMENT_RESAMPLE_PATH,
                                              "reg_resample")
 
-which_output = run_subprocess(f'which {RESAMPLE}', capture_output=True)
+which_output = run_subprocess(['which', RESAMPLE], capture_output=True)
 if(not len(which_output.stdout)):
   raise Exception("COULD NOT FIND RESAMPLE program")
 
@@ -123,14 +123,24 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     ct_nifti = cwd / "ct.nii.gz"
     pet_nifti = cwd / "pet.nii.gz"
 
-    run_subprocess(f'{DCM2NIIX} -o {str(ct_nifti)} {str(ct_path)}')
-    run_subprocess(f'{DCM2NIIX} -o {str(pet_nifti)} {str(pet_path)}')
+    run_subprocess([DCM2NIIX, '-o', str(ct_nifti), str(ct_path)])
+    run_subprocess([DCM2NIIX, '-o', str(pet_nifti), str(pet_path)])
 
     ct_nifti_cropped = crop_to_350_mm(ct_nifti)
 
     segmentation_path = cwd / "seg.nii.gz"
 
-    run_subprocess(f'podman run --security-opt=label=disable --device=nvidia.com/gpu=all -v {str(cwd)}:/usr/src/app/dataset depict/hnc_pet_gtv:latest {str(pet_nifti)} {str(ct_nifti_cropped)} {str(segmentation_path)}')
+    run_subprocess(['podman',
+                    'run',
+                    '--security-opt=label=disable',
+                    '--device=nvidia.com/gpu=all',
+                    '-v',
+                    f'{str(cwd)}:/usr/src/app/dataset',
+                    'depict/hnc_pet_gtv:latest',
+                    str(pet_nifti),
+                    str(ct_nifti_cropped),
+                    str(segmentation_path)
+                  ])
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
     mask = segmentation.get_fdata()
