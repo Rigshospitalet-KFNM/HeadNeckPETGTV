@@ -69,8 +69,8 @@ def crop_to_350_mm(nii_ct_path : Path):
   tot_slices = img.header['dim'][3]
   n_slices = int(numpy.ceil(350 / slice_thickness))
   cropped_img = img.slicer[:,:,tot_slices-n_slices:tot_slices]
-  nii_ct_path_destination = str(nii_ct_path) + "_cropped"
-  cropped_img.to_filename(nii_ct_path_destination)
+  nii_ct_path_destination = Path('ct_cropped.nii')
+  cropped_img.to_filename(str(nii_ct_path_destination))
 
   return nii_ct_path_destination
 
