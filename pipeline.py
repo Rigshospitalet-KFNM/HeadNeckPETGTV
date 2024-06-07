@@ -129,7 +129,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     pet = 'HNC04_000_PET'
     ct = 'HNC04_000_CT'
     pet_nifti = cwd / f"{pet}.nii.gz"
-    ct_nifti = cwd / "CT.nii.gz"
+    ct_nifti = cwd / "ct.nii.gz"
 
     ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'ct', '-z', 'y', str(ct_path)]
     dcm2niix_ct_output = run_subprocess(ct_command, capture_output=True)
