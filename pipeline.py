@@ -109,6 +109,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     'CT'  : CT_Input,
   }
 
+  study_expiration_days=1
   ip='0.0.0.0'
   port=11112
   log_output = Path(LOG_PATH)
@@ -120,12 +121,13 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
   def process(self, input_data: InputContainer) -> PipelineOutput:
     ct_path = input_data.paths['CT']
     pet_path = input_data.paths['PET']
-
     cwd = Path(getcwd())
     ct_nifti = cwd / "ct.nii.gz"
     pet_nifti = cwd / "pet.nii.gz"
 
+    self.logger.info(f"Running: {[DCM2NIIX, '-o', str(ct_nifti), str(ct_path)]}")
     run_subprocess([DCM2NIIX, '-o', str(ct_nifti), str(ct_path)])
+    self.logger.info(f"Running: {[DCM2NIIX, '-o', str(pet_nifti), str(pet_path)]}")
     run_subprocess([DCM2NIIX, '-o', str(pet_nifti), str(pet_path)])
 
     ct_nifti_cropped = crop_to_350_mm(ct_nifti)
@@ -165,6 +167,10 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     return DicomOutput([
       [(output_address, rt_dataset)], self.ae_title
     ])
+  
+  def post_init(self) -> None:
+    cwd = getcwd()
+    self.logger.info("Started to run the process at ")
 
 #region __main__
 if __name__ == '__main__':
