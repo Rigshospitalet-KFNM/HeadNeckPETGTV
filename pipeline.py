@@ -75,9 +75,9 @@ def crop_to_350_mm(nii_ct_path : Path):
   return nii_ct_path_destination
 
 output_address = Address(
-  '10.19.144.12',
-  104,
-  'LILJEFORS',
+  '172.16.167.172',
+  11112,
+  'STORESCP',
 )
 
 
