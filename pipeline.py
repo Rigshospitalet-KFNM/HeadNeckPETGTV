@@ -69,8 +69,8 @@ def crop_to_350_mm(nii_ct_path : Path):
   tot_slices = img.header['dim'][3]
   n_slices = int(numpy.ceil(350 / slice_thickness))
   cropped_img = img.slicer[:,:,tot_slices-n_slices:tot_slices]
-  nii_ct_path_destination = Path('ct_cropped.nii')
-  cropped_img.to_filename(str(nii_ct_path_destination))
+  nii_ct_path_destination = 'HNC04_000_CT.nii.gz'
+  cropped_img.to_filename(nii_ct_path_destination)
 
   return nii_ct_path_destination
 
@@ -125,15 +125,18 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     self.logger.info(f"CT Path: {ct_path}")
     self.logger.info(f"PET Path: {pet_path}")
     self.logger.info(f"CWD Path: {cwd}")
-    ct_nifti = cwd / "ct.nii"
-    pet_nifti = cwd / "pet.nii"
 
-    ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'ct', str(ct_path)]
+    pet = 'HNC04_000_PET'
+    ct = 'HNC04_000_CT'
+    pet_nifti = cwd / f"{pet}.nii.gz"
+    ct_nifti = cwd / "CT.nii.gz"
+
+    ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'ct', '-z', 'y', str(ct_path)]
     dcm2niix_ct_output = run_subprocess(ct_command, capture_output=True)
-    pet_command = [DCM2NIIX, '-o', str(cwd), '-f', 'pet', str(pet_path)]
+    pet_command = [DCM2NIIX, '-o', str(cwd), '-f', pet, '-z', 'y', str(pet_path)]
     dcm2niix_pet_output = run_subprocess(pet_command, capture_output=True)
     ct_nifti_cropped = crop_to_350_mm(ct_nifti)
-    segmentation_path = cwd / "seg.nii.gz"
+    segmentation_path = cwd / "segmentation.nii.gz"
 
     podman_output = run_subprocess(['podman',
                     'run',
@@ -142,9 +145,9 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                     '-v',
                     f'{str(cwd)}:/usr/src/app/dataset',
                     'depict/hnc_pet_gtv:latest',
-                    str(pet_nifti),
-                    str(ct_nifti_cropped),
-                    str(segmentation_path)
+                    f"{pet}.nii.gz",
+                    f"{ct}.nii.gz",
+                    "segmentation.nii.gz"
                   ], capture_output=True)
     
     self.logger.info(f"Podman return code: {podman_output.returncode}")
