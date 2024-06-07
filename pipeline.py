@@ -129,11 +129,16 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     pet_nifti = cwd / "pet.nii.gz"
     self.logger.info(f"Running: {[DCM2NIIX, '-o', str(ct_nifti), str(ct_path)]}")
     dcm2niix_ct_output = run_subprocess([DCM2NIIX, '-o', str(ct_nifti), str(ct_path)], capture_output=True)
-    self.logger.info(f"dcm2niix return code: {dcm2niix_ct_output.returncode}, with output {dcm2niix_ct_output.output}" )
+    self.logger.info(f"dcm2niix return code: {dcm2niix_ct_output.returncode}" )
+    self.logger.info(f"with output {dcm2niix_ct_output.stdout}")
+    self.logger.info(f"with error {dcm2niix_ct_output.stderr}" )
+  
     self.logger.info(f"Running: {[DCM2NIIX, '-o', str(pet_nifti), str(pet_path)]}")
 
     dcm2niix_pet_output = run_subprocess([DCM2NIIX, '-o', str(pet_nifti), str(pet_path)], capture_output=True)
-    self.logger.info(f"dcm2niix return code: {dcm2niix_pet_output.returncode}, with output {dcm2niix_pet_output.output}" )
+    self.logger.info(f"dcm2niix return code: {dcm2niix_pet_output.returncode}" )
+    self.logger.info(f"with output {dcm2niix_pet_output.stdout}")
+    self.logger.info(f"with error {dcm2niix_pet_output.stderr}" )
 
     ct_nifti_cropped = crop_to_350_mm(ct_nifti)
 
