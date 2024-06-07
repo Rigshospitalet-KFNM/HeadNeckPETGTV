@@ -135,7 +135,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     ct_nifti_cropped = crop_to_350_mm(ct_nifti)
     segmentation_path = cwd / "seg.nii.gz"
 
-    run_subprocess(['podman',
+    podman_output = run_subprocess(['podman',
                     'run',
                     '--security-opt=label=disable',
                     '--device=nvidia.com/gpu=all',
@@ -146,6 +146,10 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                     str(ct_nifti_cropped),
                     str(segmentation_path)
                   ], capture_output=True)
+    
+    self.logger.info(f"Podman return code: {podman_output.returncode}")
+    self.logger.info(f"Podman stdout: {podman_output.stdout}")
+    self.logger.info(f"Podman stdout: {podman_output.stderr}")
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
     mask = segmentation.get_fdata()
