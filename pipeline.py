@@ -126,8 +126,8 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     self.logger.info(f"PET Path: {pet_path}")
     self.logger.info(f"CWD Path: {cwd}")
 
-    pet = 'HNC04_000_PET'
-    ct = 'HNC04_000_CT'
+    pet = 'HNC04_0000_PET'
+    ct = 'HNC04_0000_CT'
     pet_nifti = cwd / f"{pet}.nii.gz"
     ct_nifti = cwd / "ct.nii.gz"
 
