@@ -151,8 +151,8 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                   ], capture_output=True)
     
     self.logger.info(f"Podman return code: {podman_output.returncode}")
-    self.logger.info(f"Podman stdout: {podman_output.stdout}")
-    self.logger.info(f"Podman stdout: {podman_output.stderr}")
+    self.logger.info(f"Podman stdout: {podman_output.stdout.decode()}")
+    self.logger.info(f"Podman stdout: {podman_output.stderr.decode()}")
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
     mask = segmentation.get_fdata()
