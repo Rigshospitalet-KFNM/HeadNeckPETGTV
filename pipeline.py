@@ -129,14 +129,14 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     pet_nifti = cwd / "pet.nii"
 
     ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'CT', str(ct_path)]
-    self.logger.info(f"Running: {[DCM2NIIX, '-o', str(cwd), '-f', 'CT', str(ct_path)]}")
+    self.logger.info(f"Running: {[DCM2NIIX, '-o', str(cwd), '-f', 'ct', str(ct_path)]}")
     dcm2niix_ct_output = run_subprocess(ct_command, capture_output=True)
     self.logger.info(f"dcm2niix return code: {dcm2niix_ct_output.returncode}" )
     self.logger.info(f"with output {dcm2niix_ct_output.stdout}")
     self.logger.info(f"with error {dcm2niix_ct_output.stderr}" )
   
     self.logger.info(f"Running: {[DCM2NIIX, '-o', str(cwd), str(pet_path)]}")
-    pet_command = [DCM2NIIX, '-o', str(cwd), '-f', 'PET', str(pet_path)]
+    pet_command = [DCM2NIIX, '-o', str(cwd), '-f', 'pet', str(pet_path)]
     dcm2niix_pet_output = run_subprocess(pet_command, capture_output=True)
     self.logger.info(f"dcm2niix return code: {dcm2niix_pet_output.returncode}" )
     self.logger.info(f"with output {dcm2niix_pet_output.stdout}")
