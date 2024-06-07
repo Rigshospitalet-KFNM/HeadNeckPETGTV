@@ -122,13 +122,18 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     ct_path = input_data.paths['CT']
     pet_path = input_data.paths['PET']
     cwd = Path(getcwd())
+    self.logger.info(f"CT Path: {ct_path}")
+    self.logger.info(f"PET Path: {pet_path}")
+    self.logger.info(f"CWD Path: {cwd}")
     ct_nifti = cwd / "ct.nii.gz"
     pet_nifti = cwd / "pet.nii.gz"
-
     self.logger.info(f"Running: {[DCM2NIIX, '-o', str(ct_nifti), str(ct_path)]}")
-    run_subprocess([DCM2NIIX, '-o', str(ct_nifti), str(ct_path)])
+    dcm2niix_ct_output = run_subprocess([DCM2NIIX, '-o', str(ct_nifti), str(ct_path)], capture_output=True)
+    self.logger.info(f"dcm2niix return code: {dcm2niix_ct_output.returncode}, with output {dcm2niix_ct_output.output}" )
     self.logger.info(f"Running: {[DCM2NIIX, '-o', str(pet_nifti), str(pet_path)]}")
-    run_subprocess([DCM2NIIX, '-o', str(pet_nifti), str(pet_path)])
+
+    dcm2niix_pet_output = run_subprocess([DCM2NIIX, '-o', str(pet_nifti), str(pet_path)], capture_output=True)
+    self.logger.info(f"dcm2niix return code: {dcm2niix_pet_output.returncode}, with output {dcm2niix_pet_output.output}" )
 
     ct_nifti_cropped = crop_to_350_mm(ct_nifti)
 
@@ -144,7 +149,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                     str(pet_nifti),
                     str(ct_nifti_cropped),
                     str(segmentation_path)
-                  ])
+                  ], capture_output=True)
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
     mask = segmentation.get_fdata()
