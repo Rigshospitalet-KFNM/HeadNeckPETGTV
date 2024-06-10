@@ -69,7 +69,7 @@ def crop_to_350_mm(nii_ct_path : Path):
   tot_slices = img.header['dim'][3]
   n_slices = int(numpy.ceil(350 / slice_thickness))
   cropped_img = img.slicer[:,:,tot_slices-n_slices:tot_slices]
-  nii_ct_path_destination = 'HNC04_000_CT.nii.gz'
+  nii_ct_path_destination = 'HNC04_0000_CT.nii.gz'
   cropped_img.to_filename(nii_ct_path_destination)
 
   return nii_ct_path_destination
@@ -138,7 +138,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     ct_nifti_cropped = crop_to_350_mm(ct_nifti)
     segmentation_path = cwd / "segmentation.nii.gz"
 
-    podman_output = run_subprocess(['podman',
+    podman_command = ['podman',
                     'run',
                     '--security-opt=label=disable',
                     '--device=nvidia.com/gpu=all',
@@ -148,8 +148,10 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                     f"{pet}.nii.gz",
                     f"{ct}.nii.gz",
                     "segmentation.nii.gz"
-                  ], capture_output=True)
-    
+                  ]
+    self.logger.info(podman_command)
+
+    podman_output = run_subprocess(podman_command, capture_output=True)
     self.logger.info(f"Podman return code: {podman_output.returncode}")
     self.logger.info(f"Podman stdout: {podman_output.stdout.decode()}")
     self.logger.info(f"Podman stdout: {podman_output.stderr.decode()}")
@@ -175,10 +177,10 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     return DicomOutput([
       [(output_address, rt_dataset)], self.ae_title
     ])
-  
+
   def post_init(self) -> None:
     cwd = getcwd()
-    self.logger.info("Started to run the process at ")
+    self.logger.info(f"Started to run the process at {cwd}")
 
 #region __main__
 if __name__ == '__main__':
