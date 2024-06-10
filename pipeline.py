@@ -138,16 +138,16 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     crop_to_350_mm(ct_nifti_path)
     segmentation_path = cwd / "segmentation.nii.gz"
 
-    pet_nifti = nibabel.load(pet_nifti_path)
-    pet_data = pet_nifti.get_fdata()
-    ct_nifti = nibabel.load(f"{ct}.nii.gz")
-    ct_data = ct_nifti.get_fdata()
+    resample_command = [
+      'reg_resample',
+      '-ref', 'HNC04_0000_CT.nii.gz',
+      '-flo', 'HNC04_0000_PET.nii.gz'
+    ]
+    run_subprocess(resample_command)
 
-    self.logger.info(f"Pet shape {pet_data.shape}")
-    self.logger.info(f"ct shape {ct_data.shape}")
-    self.logger.info(f"Reshaping Pet image to {ct_data.shape[2]} slices")
-    cropped_pet = pet_nifti.slicer[:,:, pet_data.shape[2] - ct_data.shape[2]: pet_data.shape[2]]
-    cropped_pet.to_filename(pet_nifti_path)
+    pet_image = nibabel.load(pet_nifti_path)
+    self.logger.info(f"Image shape: {pet_image.header['dim']}")
+
 
     podman_command = ['podman',
                     'run',
