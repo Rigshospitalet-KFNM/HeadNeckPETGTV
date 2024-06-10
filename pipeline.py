@@ -128,15 +128,23 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
 
     pet = 'HNC04_0000_PET'
     ct = 'HNC04_0000_CT'
-    pet_nifti = cwd / f"{pet}.nii.gz"
-    ct_nifti = cwd / "ct.nii.gz"
+    pet_nifti_path = cwd / f"{pet}.nii.gz"
+    ct_nifti_path = cwd / "ct.nii.gz"
 
     ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'ct', '-z', 'y', str(ct_path)]
-    dcm2niix_ct_output = run_subprocess(ct_command, capture_output=True)
+    run_subprocess(ct_command, capture_output=True)
     pet_command = [DCM2NIIX, '-o', str(cwd), '-f', pet, '-z', 'y', str(pet_path)]
-    dcm2niix_pet_output = run_subprocess(pet_command, capture_output=True)
-    ct_nifti_cropped = crop_to_350_mm(ct_nifti)
+    run_subprocess(pet_command, capture_output=True)
+    crop_to_350_mm(ct_nifti_path)
     segmentation_path = cwd / "segmentation.nii.gz"
+
+    pet_nifti = nibabel.load(pet_nifti_path)
+    pet_data = pet_nifti.get_fdata()
+    ct_nifti = nibabel.load(f"{ct}.nii.gz")
+    ct_data = ct_nifti.get_fdata()
+
+    self.logger.info(f"Pet shape {pet_data.shape}")
+    self.logger.info(f"ct shape {ct_data.shape}")
 
     podman_command = ['podman',
                     'run',
