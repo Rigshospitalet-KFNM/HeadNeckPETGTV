@@ -69,7 +69,7 @@ def crop_to_350_mm(nii_ct_path : Path):
   tot_slices = img.header['dim'][3]
   n_slices = int(numpy.ceil(350 / slice_thickness))
   cropped_img = img.slicer[:,:,tot_slices-n_slices:tot_slices]
-  nii_ct_path_destination = 'HNC04_0000_CT.nii.gz'
+  nii_ct_path_destination = 'HNC04_000_CT.nii.gz'
   cropped_img.to_filename(nii_ct_path_destination)
 
   return nii_ct_path_destination
@@ -126,29 +126,34 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     self.logger.info(f"PET Path: {pet_path}")
     self.logger.info(f"CWD Path: {cwd}")
 
-    pet = 'HNC04_0000_PET'
-    ct = 'HNC04_0000_CT'
-    pet_nifti_path = cwd / f"{pet}.nii.gz"
-    ct_nifti_path = cwd / "ct.nii.gz"
+    pet_destination_path = "HNC04_000_PET.nii.gz"
 
-    ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'ct', '-z', 'y', str(ct_path)]
+
+
+    ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'ct',str(ct_path)]
     run_subprocess(ct_command, capture_output=True)
-    pet_command = [DCM2NIIX, '-o', str(cwd), '-f', pet, '-z', 'y', str(pet_path)]
+    pet_command = [DCM2NIIX, '-o', str(cwd), '-f', 'pet', str(pet_path)]
     run_subprocess(pet_command, capture_output=True)
-    crop_to_350_mm(ct_nifti_path)
-    segmentation_path = cwd / "segmentation.nii.gz"
+    ct_nifti_path = crop_to_350_mm('ct.nii')
 
     resample_command = [
       'reg_resample',
-      '-ref', 'HNC04_0000_CT.nii.gz',
-      '-flo', 'HNC04_0000_PET.nii.gz'
+      '-ref', ct_nifti_path,
+      '-flo', 'pet.nii',
+      '-res', pet_destination_path,
     ]
-    run_subprocess(resample_command)
+    self.logger.info(f"Running: {resample_command}")
+    resample_output = run_subprocess(resample_command, capture_output=True)
 
-    pet_image = nibabel.load(pet_nifti_path)
+    self.logger.info(f"Podman return code: {resample_output.returncode}")
+    self.logger.info(f"Podman stdout: {resample_output.stdout.decode()}")
+    self.logger.info(f"Podman stdout: {resample_output.stderr.decode()}")
+
+    pet_image = nibabel.load(pet_destination_path)
     self.logger.info(f"Image shape: {pet_image.header['dim']}")
 
 
+    segmentation_path = cwd / "segmentation.nii.gz"
     podman_command = ['podman',
                     'run',
                     '--security-opt=label=disable',
