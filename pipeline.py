@@ -161,8 +161,8 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                     '-v',
                     f'{str(cwd)}:/usr/src/app/dataset',
                     'depict/hnc_pet_gtv:latest',
-                    f"{pet}.nii.gz",
-                    f"{ct}.nii.gz",
+                    pet_destination_path,
+                    ct_nifti_path,
                     "segmentation.nii.gz"
                   ]
     self.logger.info(podman_command)
