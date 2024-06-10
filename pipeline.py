@@ -1,7 +1,7 @@
 #region Imports
 # Python standard library
 from logging import DEBUG
-from subprocess import run as run_subprocess
+from subprocess import run as run_subprocess, CompletedProcess
 from pathlib import Path
 from os import environ, getcwd
 
@@ -118,6 +118,12 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
   processing_directory = WORKING_PATH
   log_level = DEBUG
 
+  def log_subprocess(self, output: CompletedProcess, process_name: str):
+    if output.returncode != 0:
+      self.logger.error(f"{process_name} return code: {output.returncode}")
+      self.logger.error(f"{process_name} stdout: {output.stdout.decode()}")
+      self.logger.error(f"{process_name} stderr: {output.stderr.decode()}")
+
   def process(self, input_data: InputContainer) -> PipelineOutput:
     ct_path = input_data.paths['CT']
     pet_path = input_data.paths['PET']
@@ -131,9 +137,14 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
 
 
     ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'ct',str(ct_path)]
-    run_subprocess(ct_command, capture_output=True)
+    self.log_subprocess(run_subprocess(ct_command, capture_output=True),
+                        "dcm2niix ct")
+
+
     pet_command = [DCM2NIIX, '-o', str(cwd), '-f', 'pet', str(pet_path)]
-    run_subprocess(pet_command, capture_output=True)
+    self.log_subprocess(run_subprocess(pet_command, capture_output=True),
+                        "dcm2niix pet")
+
     ct_nifti_path = crop_to_350_mm('ct.nii')
 
     resample_command = [
@@ -142,17 +153,13 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
       '-flo', 'pet.nii',
       '-res', pet_destination_path,
     ]
-    self.logger.info(f"Running: {resample_command}")
-    resample_output = run_subprocess(resample_command, capture_output=True)
+    
+    self.log_subprocess(run_subprocess(resample_command, capture_output=True),
+                        'Pet Resample')
 
-    self.logger.info(f"Podman return code: {resample_output.returncode}")
-    self.logger.info(f"Podman stdout: {resample_output.stdout.decode()}")
-    self.logger.info(f"Podman stdout: {resample_output.stderr.decode()}")
 
     pet_image = nibabel.load(pet_destination_path)
-    self.logger.info(f"Image shape: {pet_image.header['dim']}")
-
-
+    #
     segmentation_path = cwd / "segmentation.nii.gz"
     podman_command = ['podman',
                     'run',
@@ -165,15 +172,11 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                     ct_nifti_path,
                     "segmentation.nii.gz"
                   ]
-    self.logger.info(podman_command)
-
-    podman_output = run_subprocess(podman_command, capture_output=True)
-    self.logger.info(f"Podman return code: {podman_output.returncode}")
-    self.logger.info(f"Podman stdout: {podman_output.stdout.decode()}")
-    self.logger.info(f"Podman stdout: {podman_output.stderr.decode()}")
+    self.log_subprocess(run_subprocess(podman_command, capture_output=True),
+                        'Podman')
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
-    mask = segmentation.get_fdata()
+    mask = segmentation.get_fdata().astype(numpy.bool_)
 
     # Assume this works!
     rt_struct = RTStructBuilder.create_new(
