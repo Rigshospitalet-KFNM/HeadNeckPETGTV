@@ -209,12 +209,12 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     pipeline_mask = segmentation.get_fdata().astype(numpy.bool_)
 
     # Resize mask such that fits with the CT
-    empty_mask = numpy.zeros((len(input_data.datasets['CT']) - pet_data.shape[0],
+    empty_mask = numpy.zeros((pet_data.shape[0],
                               pet_data.shape[1],
-                              pet_data.shape[2]),
+                              len(input_data.datasets['CT'])- pet_data.shape[2]),
                               dtype=numpy.bool_)
 
-    mask = numpy.concatenate((empty_mask, pipeline_mask), axis=0)
+    mask = numpy.concatenate((empty_mask, pipeline_mask), axis=2)
     self.logger.error(f"Pipeline Mask shape: {pipeline_mask.shape}")
     self.logger.error(f"Mask shape: {mask.shape}")
     self.logger.error(f"CT images: {len(input_data.datasets['CT'])}")
