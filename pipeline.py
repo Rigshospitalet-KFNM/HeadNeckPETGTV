@@ -12,7 +12,7 @@ import numpy
 from pydicom import dcmread
 from rt_utils import RTStructBuilder
 from dicomnode.dicom.dimse import Address
-from dicomnode.server.grinders import IdentityGrinder
+from dicomnode.server.grinders import ListGrinder
 from dicomnode.server.nodes import AbstractQueuedPipeline
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import DicomOutput, PipelineOutput, FileOutput, MultiOutput
@@ -105,7 +105,7 @@ class PET_Input(AbstractInput):
   def validate(self) -> bool:
     return self.images > 0
 
-  image_grinder = IdentityGrinder()
+  image_grinder = ListGrinder()
 
 class CT_Input(AbstractInput):
   required_values = {
@@ -115,7 +115,7 @@ class CT_Input(AbstractInput):
   def validate(self) -> bool:
     return self.images > 0
 
-  image_grinder = IdentityGrinder()
+  image_grinder = ListGrinder()
 
 #region Pipeline
 class PET_GTV_Pipeline(AbstractQueuedPipeline):
