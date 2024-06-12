@@ -133,11 +133,16 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
   processing_directory = WORKING_PATH
   log_level = DEBUG
 
-  def log_subprocess(self, output: CompletedProcess, process_name: str):
+  def log_subprocess(self, output: CompletedProcess, process_name: str, log_anyways=False):
     if output.returncode != 0:
       self.logger.error(f"{process_name} return code: {output.returncode}")
       self.logger.error(f"{process_name} stdout: {output.stdout.decode()}")
       self.logger.error(f"{process_name} stderr: {output.stderr.decode()}")
+      return
+    if log_anyways:
+      self.logger.info(f"{process_name} return code: {output.returncode}")
+      self.logger.info(f"self.ae_title"{process_name} stdout: {output.stdout.decode()}")
+      self.logger.info(f"{process_name} stderr: {output.stderr.decode()}")
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
     ct_path = input_data.paths['CT']
@@ -203,7 +208,8 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                     "segmentation.nii.gz"
                   ]
     self.log_subprocess(run_subprocess(podman_command, capture_output=True),
-                        'Podman')
+                        'Podman',
+                        log_anyways=True)
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
     pipeline_mask = segmentation.get_fdata().astype(numpy.bool_)
@@ -236,8 +242,8 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     rt_dataset.SeriesDescription = "PET GTV AT Segmentation"
 
     return DicomOutput([
-      [(output_address, rt_dataset)], self.ae_title
-    ])
+      [(output_address, rt_dataset)],
+    ], self.ae_title)
 
   def post_init(self) -> None:
     cwd = getcwd()
