@@ -150,7 +150,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     acquisition_time_str = pivot_pet_dataset.AcquisitionTime
     acquisition_datetime = datetime.strptime(f"{acquisition_date_str}{acquisition_time_str}",timestamp_format)
     tracer_info = pivot_pet_dataset.RadiopharmaceuticalInformationSequence[0]
-    injection_datetime = datetime.strptime(tracer_info.z.RadiopharmaceuticalStartDateTime, timestamp_format)
+    injection_datetime = datetime.strptime(tracer_info.RadiopharmaceuticalStartDateTime, timestamp_format)
     decay_delta_time = acquisition_datetime - injection_datetime
     injection_dose_MBq = tracer_info.RadionuclideTotalDose / 1_000_000
     halflife_seconds = tracer_info.RadionuclideHalfLife
