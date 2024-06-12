@@ -1,5 +1,6 @@
 #region Imports
 # Python standard library
+from datetime import datetime, timedelta
 from logging import DEBUG
 from subprocess import run as run_subprocess, CompletedProcess
 from pathlib import Path
@@ -8,6 +9,7 @@ from os import environ, getcwd
 # Third party Packages
 import nibabel
 import numpy
+from pydicom import dcmread
 from rt_utils import RTStructBuilder
 from dicomnode.dicom.dimse import Address
 from dicomnode.server.grinders import IdentityGrinder
@@ -74,6 +76,19 @@ def crop_to_350_mm(nii_ct_path : Path):
 
   return nii_ct_path_destination
 
+
+timestamp_format = "%Y%m%d%H%M%S.%f"
+
+def dose_calculation(initial_dose,
+                     halflife_seconds,
+                     decay_time_delta: timedelta ,
+                     ):
+  return initial_dose * numpy.exp(numpy.log(2) / halflife_seconds * (-decay_time_delta.seconds))
+
+
+def suv_rescale(image: numpy.ndarray, dose:float, patient_weight: float):
+  return image / (dose / patient_weight)
+
 output_address = Address(
   '172.16.167.172',
   11112,
@@ -127,15 +142,24 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
   def process(self, input_data: InputContainer) -> PipelineOutput:
     ct_path = input_data.paths['CT']
     pet_path = input_data.paths['PET']
+    pivot_pet_dataset = input_data['PET'][0]
+
+    # region SUV calculation
+    patient_weight = pivot_pet_dataset.PatientWeight
+    acquisition_date_str = pivot_pet_dataset.AcquisitionDate
+    acquisition_time_str = pivot_pet_dataset.AcquisitionTime
+    acquisition_datetime = datetime.strptime(f"{acquisition_date_str}{acquisition_time_str}",timestamp_format)
+    tracer_info = pivot_pet_dataset.RadiopharmaceuticalInformationSequence[0]
+    injection_datetime = datetime.strptime(tracer_info.z.RadiopharmaceuticalStartDateTime, timestamp_format)
+    decay_delta_time = acquisition_datetime - injection_datetime
+    injection_dose_MBq = tracer_info.RadionuclideTotalDose / 1_000_000
+    halflife_seconds = tracer_info.RadionuclideHalfLife
+    corrected_dose = dose_calculation(injection_dose_MBq, halflife_seconds, decay_delta_time)
+
+
+    # Dicom to nifti conversion
     cwd = Path(getcwd())
-    self.logger.info(f"CT Path: {ct_path}")
-    self.logger.info(f"PET Path: {pet_path}")
-    self.logger.info(f"CWD Path: {cwd}")
-
     pet_destination_path = "HNC04_000_PET.nii.gz"
-
-
-
     ct_command = [DCM2NIIX, '-o', str(cwd), '-f', 'ct',str(ct_path)]
     self.log_subprocess(run_subprocess(ct_command, capture_output=True),
                         "dcm2niix ct")
@@ -147,18 +171,24 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
 
     ct_nifti_path = crop_to_350_mm('ct.nii')
 
+    #region Resampling
     resample_command = [
       'reg_resample',
       '-ref', ct_nifti_path,
       '-flo', 'pet.nii',
       '-res', pet_destination_path,
     ]
-    
+
     self.log_subprocess(run_subprocess(resample_command, capture_output=True),
                         'Pet Resample')
 
 
     pet_image = nibabel.load(pet_destination_path)
+    pet_data = pet_image.get_fdata()
+    pet_data = suv_rescale(pet_data, corrected_dose, patient_weight)
+    pet_image = nibabel.Nifti1Image(pet_data, pet_image.affine, pet_image.header)
+    nibabel.save(pet_image, pet_destination_path)
+
     #
     segmentation_path = cwd / "segmentation.nii.gz"
     podman_command = ['podman',
@@ -176,11 +206,22 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                         'Podman')
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
-    mask = segmentation.get_fdata().astype(numpy.bool_)
+    pipeline_mask = segmentation.get_fdata().astype(numpy.bool_)
 
-    # Assume this works!
+    # Resize mask such that fits with the CT
+    empty_mask = numpy.zeros((len(input_data.datasets['CT']) - pet_data.shape[0],
+                              pet_data.shape[1],
+                              pet_data.shape[2]),
+                              dtype=numpy.bool_)
+
+    mask = numpy.concatenate((empty_mask, pipeline_mask), axis=0)
+    self.logger.error(f"Pipeline Mask shape: {pipeline_mask.shape}")
+    self.logger.error(f"Mask shape: {mask.shape}")
+    self.logger.error(f"CT images: {len(input_data.datasets['CT'])}")
+
+
     rt_struct = RTStructBuilder.create_new(
-      str(pet_path)
+      str(ct_path)
     )
 
     rt_struct.add_roi(
