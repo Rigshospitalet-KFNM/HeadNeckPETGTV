@@ -90,9 +90,9 @@ def suv_rescale(image: numpy.ndarray, dose:float, patient_weight: float):
   return image / (dose / patient_weight)
 
 output_address = Address(
-  '172.16.167.172',
-  11112,
-  'STORESCP',
+  '10.49.144.12',
+  104,
+  'LILJEFORS',
 )
 
 
@@ -141,7 +141,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
       return
     if log_anyways:
       self.logger.info(f"{process_name} return code: {output.returncode}")
-      self.logger.info(f"self.ae_title"{process_name} stdout: {output.stdout.decode()}")
+      self.logger.info(f"{process_name} stdout: {output.stdout.decode()}")
       self.logger.info(f"{process_name} stderr: {output.stderr.decode()}")
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
