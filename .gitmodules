@@ -1,6 +1,6 @@
-[submodule "submodules/niftyreg-git"]
-	path = submodules/niftyreg-git
-	url = https://git.code.sf.net/p/niftyreg/git
 [submodule "submodules/dicom_node"]
 	path = submodules/dicom_node
 	url = https://github.com/Rigshospitalet-KFNM/DicomNode
+[submodule "submodules/niftyreg"]
+	path = submodules/niftyreg
+	url = https://git.code.sf.net/p/niftyreg/git
