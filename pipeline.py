@@ -266,7 +266,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     rt_dataset.SeriesDescription = "PET GTV AT Segmentation"
 
     return DicomOutput([
-      [(output_address, rt_dataset)],
+      (output_address, rt_dataset),
     ], self.ae_title)
 
   def post_init(self) -> None:
