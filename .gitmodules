@@ -4,3 +4,6 @@
 [submodule "submodules/niftyreg"]
 	path = submodules/niftyreg
 	url = https://git.code.sf.net/p/niftyreg/git
+[submodule "submodules/dcm2niix"]
+	path = submodules/dcm2niix
+	url = https://github.com/rordenlab/dcm2niix
