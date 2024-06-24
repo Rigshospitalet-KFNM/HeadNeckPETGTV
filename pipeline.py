@@ -9,7 +9,6 @@ from os import environ, getcwd
 # Third party Packages
 import nibabel
 import numpy
-from pydicom import dcmread
 from rt_utils import RTStructBuilder
 from dicomnode.dicom.dimse import Address
 from dicomnode.server.grinders import ListGrinder
@@ -61,6 +60,27 @@ which_output = run_subprocess(['which', RESAMPLE], capture_output=True)
 if(not len(which_output.stdout)):
   raise Exception("COULD NOT FIND RESAMPLE program")
 
+ENVIRONMENT_ACCEPTED_AE_TITLE = "PIPELINE_AE_TITLE"
+RAW_AE_TITLES = environ.get(ENVIRONMENT_ACCEPTED_AE_TITLE,
+                                             None)
+if RAW_AE_TITLES is None:
+  ae_titles = []
+else:
+  ae_titles = [
+    ae_title.strip() for ae_title in RAW_AE_TITLES.split(",")
+  ]
+
+ENVIRONMENT_SEGMENTATION_PATH = "PIPELINE_SEGMENTATION_ARCHIVE"
+RAW_SEGMENTATION_PATH = environ.get(ENVIRONMENT_SEGMENTATION_PATH,
+                                                None)
+if RAW_SEGMENTATION_PATH is not None:
+  SEGMENTATION_PATH = Path(RAW_SEGMENTATION_PATH)
+  if not SEGMENTATION_PATH.exists():
+    raise Exception(f"Segmentation path {RAW_SEGMENTATION_PATH} does not exists, please create it!")
+  if SEGMENTATION_PATH.is_file():
+    raise Exception(f"Segmentation path {RAW_SEGMENTATION_PATH} should NOT be a file!")
+else:
+  SEGMENTATION_PATH = None
 
 #region Setup
 def crop_to_350_mm(nii_ct_path : Path):
@@ -123,6 +143,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     'PET' : PET_Input,
     'CT'  : CT_Input,
   }
+  require_calling_aet = ae_titles
 
   study_expiration_days=1
   ip='0.0.0.0'
@@ -212,6 +233,12 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                         log_anyways=True)
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
+
+    if SEGMENTATION_PATH is not None:
+      segmentation.to_filename(
+        SEGMENTATION_PATH / f"HNC07_{pivot_pet_dataset.PatientID}_{pivot_pet_dataset.StudyInstanceUID}.nii.gz"
+      )
+      
     pipeline_mask = segmentation.get_fdata().astype(numpy.bool_)
 
     # Resize mask such that fits with the CT
@@ -221,9 +248,6 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                               dtype=numpy.bool_)
 
     mask = numpy.concatenate((empty_mask, pipeline_mask), axis=2)
-    self.logger.error(f"Pipeline Mask shape: {pipeline_mask.shape}")
-    self.logger.error(f"Mask shape: {mask.shape}")
-    self.logger.error(f"CT images: {len(input_data.datasets['CT'])}")
 
 
     rt_struct = RTStructBuilder.create_new(
