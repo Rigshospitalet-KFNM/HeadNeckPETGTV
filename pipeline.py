@@ -234,9 +234,9 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
 
-    self.logger("Pet image affine")
+    self.logger.error("Pet image affine")
     self.logger.error(pet_image.affine)
-    self.logger("Segmentation image affine")
+    self.logger.error("Segmentation image affine")
     self.logger.error(segmentation.affine)
 
     if SEGMENTATION_PATH is not None:
