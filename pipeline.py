@@ -246,7 +246,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
       
     pipeline_mask = segmentation.get_fdata().astype(numpy.bool_)
 
-    rotate_mask = numpy.rot90(pipeline_mask, 1, (1,2))
+    rotate_mask = numpy.rot90(pipeline_mask, 1, (0,1))
 
     # Resize mask such that fits with the CT
     empty_mask = numpy.zeros((pet_data.shape[0],
