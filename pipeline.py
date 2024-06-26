@@ -234,6 +234,11 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
 
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
 
+    self.logger("Pet image affine")
+    self.logger.error(pet_image.affine)
+    self.logger("Segmentation image affine")
+    self.logger.error(segmentation.affine)
+
     if SEGMENTATION_PATH is not None:
       segmentation.to_filename(
         SEGMENTATION_PATH / f"HNC07_{pivot_pet_dataset.PatientID}_{pivot_pet_dataset.StudyInstanceUID}.nii.gz"
@@ -241,14 +246,16 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
       
     pipeline_mask = segmentation.get_fdata().astype(numpy.bool_)
 
+    rotate_mask = numpy.rot90(pipeline_mask, 1, (1,2))
+
     # Resize mask such that fits with the CT
     empty_mask = numpy.zeros((pet_data.shape[0],
                               pet_data.shape[1],
                               len(input_data.datasets['CT']) - pet_data.shape[2]),
                               dtype=numpy.bool_)
 
-    mask = numpy.concatenate((empty_mask, pipeline_mask), axis=2)
-
+    mask = numpy.concatenate((empty_mask, rotate_mask), axis=2)
+    
 
     rt_struct = RTStructBuilder.create_new(
       str(ct_path)
@@ -263,7 +270,6 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
 
     rt_dataset = rt_struct.ds
     # The output dataset to change
-    self.logger.error(rt_dataset)
     rt_dataset.SeriesDescription = "PET GTV AI Segmentation"
 
     return DicomOutput([
