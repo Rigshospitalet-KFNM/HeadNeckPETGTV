@@ -5,10 +5,13 @@ from logging import DEBUG
 from subprocess import run as run_subprocess, CompletedProcess
 from pathlib import Path
 from os import environ, getcwd
+from random import randint
+
 
 # Third party Packages
 import nibabel
 import numpy
+import numpy as np
 from rt_utils import RTStructBuilder
 from dicomnode.dicom.dimse import Address
 from dicomnode.server.grinders import ListGrinder
@@ -16,7 +19,7 @@ from dicomnode.server.nodes import AbstractQueuedPipeline
 from dicomnode.server.input import AbstractInput
 from dicomnode.server.output import DicomOutput, PipelineOutput, FileOutput, MultiOutput
 from dicomnode.server.pipeline_tree import InputContainer
-
+from dicomnode.lib.logging import get_logger
 
 #region Environment Setup
 ENVIRONMENT_ARCHIVE_PATH = "PIPELINE_ARCHIVE_PATH"
@@ -88,11 +91,35 @@ def crop_to_350_mm(nii_ct_path : Path):
   img = nibabel.load(nii_ct_path)
 
   slice_thickness = img.header['pixdim'][3]
-  tot_slices = img.header['dim'][3]
-  n_slices = int(numpy.ceil(350 / slice_thickness))
-  cropped_img = img.slicer[:,:,tot_slices-n_slices:tot_slices]
+  total_slices = img.header['dim'][3]
+  slices_per_35cm = int(numpy.ceil(350 / slice_thickness))
+
+  #logger = get_logger()
+  #logger.info(f"img.header: {img.header}")
+  #logger.info(f"n_slices: {n_slices}")
+  #logger.info(f"tot_slices: {tot_slices}")
+
+  crop_slices = min(slices_per_35cm, total_slices)
+
+  data = img.get_fdata()
+  start = 0
+
+  sliced_data = data[:,:, start : crop_slices ]
+  #cropped_img = img.slicer[:,:,tot_slices-n_slices:total_slices]
+
+  new_header = img.header.copy()
+
+  new_header['dim'][0] = 3
+  new_header['dim'][1] = sliced_data.shape[0]
+  new_header['dim'][2] = sliced_data.shape[1]
+  new_header['dim'][3] = sliced_data.shape[2]
+
+  new_nifti = nibabel.Nifti1Image(sliced_data, img.affine, new_header)
+
   nii_ct_path_destination = 'HNC04_000_CT.nii.gz'
-  cropped_img.to_filename(nii_ct_path_destination)
+  #cropped_img.to_filename(nii_ct_path_destination)
+
+  new_nifti.to_filename(nii_ct_path_destination)
 
   return nii_ct_path_destination
 
@@ -143,7 +170,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     'PET' : PET_Input,
     'CT'  : CT_Input,
   }
-  require_calling_aet = ae_titles
+  require_calling_aet = []
 
   study_expiration_days=1
   ip='0.0.0.0'
@@ -157,13 +184,13 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
   def log_subprocess(self, output: CompletedProcess, process_name: str, log_anyways=False):
     if output.returncode != 0:
       self.logger.error(f"{process_name} return code: {output.returncode}")
-      self.logger.error(f"{process_name} stdout: {output.stdout.decode()}")
-      self.logger.error(f"{process_name} stderr: {output.stderr.decode()}")
+      #self.logger.error(f"{process_name} stdout: {output.stdout.decode()}")
+      #self.logger.error(f"{process_name} stderr: {output.stderr.decode()}")
       return
     if log_anyways:
       self.logger.info(f"{process_name} return code: {output.returncode}")
-      self.logger.info(f"{process_name} stdout: {output.stdout.decode()}")
-      self.logger.info(f"{process_name} stderr: {output.stderr.decode()}")
+      #self.logger.info(f"{process_name} stdout: {output.stdout.decode()}")
+      #self.logger.info(f"{process_name} stderr: {output.stderr.decode()}")
 
   def process(self, input_data: InputContainer) -> PipelineOutput:
     ct_path = input_data.paths['CT']
@@ -195,8 +222,14 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     self.log_subprocess(run_subprocess(pet_command, capture_output=True),
                         "dcm2niix pet")
 
-    ct_nifti_path = crop_to_350_mm('ct.nii')
+    #ct_nifti = nibabel.load('ct.nii')
+    #data = ct_nifti.get_fdata().astype('float32')
+    #header = ct_nifti.header.copy()
+    #header.set_data_dtype('float32')
+    #nibabel.save(nibabel.Nifti1Image(data, ct_nifti.affine, header), 'ct_f32.nii')
 
+    ct_nifti_path = crop_to_350_mm('ct.nii')
+    self.logger.info("Preprocessing step 1 complete, resampeling")
     #region Resampling
     resample_command = [
       'reg_resample',
@@ -205,10 +238,10 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
       '-res', pet_destination_path,
     ]
 
-    self.log_subprocess(run_subprocess(resample_command, capture_output=True),
+    self.log_subprocess(run_subprocess(resample_command, capture_output=False),
                         'Pet Resample')
 
-
+    self.logger.info("Resampleing compelete")
     pet_image = nibabel.load(pet_destination_path)
     pet_data = pet_image.get_fdata()
     pet_data = suv_rescale(pet_data, corrected_dose, patient_weight)
@@ -228,22 +261,22 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                     ct_nifti_path,
                     "segmentation.nii.gz"
                   ]
-    self.log_subprocess(run_subprocess(podman_command, capture_output=True),
-                        'Podman',
-                        log_anyways=True)
-
+    self.logger.info("Started podman process")
+    self.log_subprocess(run_subprocess(podman_command, capture_output=False),                        'Podman',
+                        log_anyways=False)
+    self.logger.info("Finished podman process, started post processing")
     segmentation: nibabel.nifti1.Nifti1Image = nibabel.load(str(segmentation_path))
 
-    self.logger.error("Pet image affine")
-    self.logger.error(pet_image.affine)
-    self.logger.error("Segmentation image affine")
-    self.logger.error(segmentation.affine)
+    #self.logger.error("Pet image affine")
+    #self.logger.error(pet_image.affine)
+    #self.logger.error("Segmentation image affine")
+    #self.logger.error(segmentation.affine)
 
     if SEGMENTATION_PATH is not None:
-      segmentation.to_filename(
-        SEGMENTATION_PATH / f"HNC07_{pivot_pet_dataset.PatientID}_{pivot_pet_dataset.StudyInstanceUID}.nii.gz"
-      )
-      
+      segmentation_path = SEGMENTATION_PATH / f"HNC07_{pivot_pet_dataset.PatientID}_{pivot_pet_dataset.StudyInstanceUID}.nii.gz"
+      self.logger.info(f"Saved file at {segmentation_path}")
+      segmentation.to_filename(segmentation_path)
+
     pipeline_mask = segmentation.get_fdata().astype(numpy.bool_)
 
     rotate_mask = numpy.rot90(pipeline_mask, 1, (0,1))
@@ -255,7 +288,7 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
                               dtype=numpy.bool_)
 
     mask = numpy.concatenate((empty_mask, rotate_mask), axis=2)
-    
+
 
     rt_struct = RTStructBuilder.create_new(
       str(ct_path)
@@ -271,6 +304,12 @@ class PET_GTV_Pipeline(AbstractQueuedPipeline):
     rt_dataset = rt_struct.ds
     # The output dataset to change
     rt_dataset.SeriesDescription = "PET GTV AI Segmentation"
+    rt_dataset.SeriesNumber = randint(5000,100000)
+    now = datetime.now()
+    rt_dataset.SeriesTime = now.time()
+    rt_dataset.SeriesDate = now.date()
+
+    self.logger.info("Finished Post processing")
 
     return DicomOutput([
       (output_address, [rt_dataset]),
